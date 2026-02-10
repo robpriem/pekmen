@@ -1,4 +1,4 @@
-# Pacman - Capture the Flag: _[Teamnaam]_
+# Pacman - Capture the Flag: PacBoys
 
 Deze repo dient als inzending voor het toernooi "Pacman - Capture the Flag".
 In `my_team.py` werd(en) de klasse(n) geïmplementeerd waarmee een team van twee agents geïnstantieerd kan worden in het `capture-the-flag` framework.
