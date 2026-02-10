@@ -32,6 +32,8 @@ from util import nearest_point
 # Team creation #
 #################
 
+#test4
+
 def create_team(first_index, second_index, is_red,
                 first='OffensiveReflexAgent', second='DefensiveReflexAgent', num_training=0):
     """
@@ -47,6 +49,7 @@ def create_team(first_index, second_index, is_red,
     For the nightly contest, however, your team will be created without
     any extra arguments, so you should make sure that the default
     behavior is what you want for the nightly contest.
+
     """
     return [eval(first)(first_index), eval(second)(second_index)]
 
