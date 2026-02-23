@@ -32,7 +32,7 @@ from util import nearest_point
 # Team creation #
 #################
 
-#test4
+#test4546
 
 def create_team(first_index, second_index, is_red,
                 first='OffensiveReflexAgent', second='DefensiveReflexAgent', num_training=0):
