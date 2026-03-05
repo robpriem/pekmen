@@ -1,32 +1,10 @@
-# baseline_team.py
-# ---------------
-# Licensing Information:  You are free to use or extend these projects for
-# educational purposes provided that (1) you do not distribute or publish
-# solutions, (2) you retain this notice, and (3) you provide clear
-# attribution to UC Berkeley, including a link to http://ai.berkeley.edu.
-# 
-# Attribution Information: The Pacman AI projects were developed at UC Berkeley.
-# The core projects and autograders were primarily created by John DeNero
-# (denero@cs.berkeley.edu) and Dan Klein (klein@cs.berkeley.edu).
-# Student side autograding was added by Brad Miller, Nick Hay, and
-# Pieter Abbeel (pabbeel@cs.berkeley.edu).
-
-
-# baseline_team.py
-# ---------------
-# Licensing Information: Please do not distribute or publish solutions to this
-# project. You are free to use and extend these projects for educational
-# purposes. The Pacman AI projects were developed at UC Berkeley, primarily by
-# John DeNero (denero@cs.berkeley.edu) and Dan Klein (klein@cs.berkeley.edu).
-# For more info, see http://inst.eecs.berkeley.edu/~cs188/sp09/pacman.html
-
 import random
 import util
-
 from capture_agents import CaptureAgent
 from game import Directions
 from util import nearest_point
 
+<<<<<<< HEAD
 
 #################
 # Team creation #
@@ -51,151 +29,207 @@ def create_team(first_index, second_index, is_red,
     behavior is what you want for the nightly contest.
 
     """
+=======
+def create_team(first_index, second_index, is_red,
+                first='OffensiveMinimaxAgent', second='OffensiveMinimaxAgent', num_training=0):
+>>>>>>> 4209c55d9c88d4d824bb4c4f0eeaf0606395a890
     return [eval(first)(first_index), eval(second)(second_index)]
 
 
-##########
-# Agents #
-##########
-
-class ReflexCaptureAgent(CaptureAgent):
-    """
-    A base class for reflex agents that choose score-maximizing actions
-    """
-
-    def __init__(self, index, time_for_computing=.1):
-        super().__init__(index, time_for_computing)
-        self.start = None
-
+class OffensiveMinimaxAgent(CaptureAgent):
     def register_initial_state(self, game_state):
+        super().register_initial_state(game_state)
         self.start = game_state.get_agent_position(self.index)
-        CaptureAgent.register_initial_state(self, game_state)
+        self.boundary = self._compute_boundary_positions(game_state)
+        self.boundary_home = min(
+            self.boundary,
+            key=lambda p: abs(p[1] - (game_state.data.layout.height // 2))
+        )
+        self.search_depth = 2
+        self.return_food_threshold = 5
+        self.danger_dist = 3
+        self.endgame_return_buffer = 35
 
     def choose_action(self, game_state):
-        """
-        Picks among the actions with the highest Q(s,a).
-        """
-        actions = game_state.get_legal_actions(self.index)
-
-        # You can profile your evaluation time by uncommenting these lines
-        # start = time.time()
-        values = [self.evaluate(game_state, a) for a in actions]
-        # print 'eval time for agent %d: %.4f' % (self.index, time.time() - start)
-
-        max_value = max(values)
-        best_actions = [a for a, v in zip(actions, values) if v == max_value]
-
-        food_left = len(self.get_food(game_state).as_list())
-
-        if food_left <= 2:
-            best_dist = 9999
-            best_action = None
-            for action in actions:
-                successor = self.get_successor(game_state, action)
-                pos2 = successor.get_agent_position(self.index)
-                dist = self.get_maze_distance(self.start, pos2)
-                if dist < best_dist:
-                    best_action = action
-                    best_dist = dist
-            return best_action
-
-        return random.choice(best_actions)
-
-    def get_successor(self, game_state, action):
-        """
-        Finds the next successor which is a grid position (location tuple).
-        """
-        successor = game_state.generate_successor(self.index, action)
-        pos = successor.get_agent_state(self.index).get_position()
-        if pos != nearest_point(pos):
-            # Only half a grid position was covered
-            return successor.generate_successor(self.index, action)
-        else:
-            return successor
-
-    def evaluate(self, game_state, action):
-        """
-        Computes a linear combination of features and feature weights
-        """
-        features = self.get_features(game_state, action)
-        weights = self.get_weights(game_state, action)
-        return features * weights
-
-    def get_features(self, game_state, action):
-        """
-        Returns a counter of features for the state
-        """
-        features = util.Counter()
-        successor = self.get_successor(game_state, action)
-        features['successor_score'] = self.get_score(successor)
-        return features
-
-    def get_weights(self, game_state, action):
-        """
-        Normally, weights do not depend on the game state.  They can be either
-        a counter or a dictionary.
-        """
-        return {'successor_score': 1.0}
-
-
-class OffensiveReflexAgent(ReflexCaptureAgent):
-    """
-  A reflex agent that seeks food. This is an agent
-  we give you to get an idea of what an offensive agent might look like,
-  but it is by no means the best or only way to build an offensive agent.
-  """
-
-    def get_features(self, game_state, action):
-        features = util.Counter()
-        successor = self.get_successor(game_state, action)
-        food_list = self.get_food(successor).as_list()
-        features['successor_score'] = -len(food_list)  # self.get_score(successor)
-
-        # Compute distance to the nearest food
-
-        if len(food_list) > 0:  # This should always be True,  but better safe than sorry
-            my_pos = successor.get_agent_state(self.index).get_position()
-            min_distance = min([self.get_maze_distance(my_pos, food) for food in food_list])
-            features['distance_to_food'] = min_distance
-        return features
-
-    def get_weights(self, game_state, action):
-        return {'successor_score': 100, 'distance_to_food': -1}
-
-
-class DefensiveReflexAgent(ReflexCaptureAgent):
-    """
-    A reflex agent that keeps its side Pacman-free. Again,
-    this is to give you an idea of what a defensive agent
-    could be like.  It is not the best or only way to make
-    such an agent.
-    """
-
-    def get_features(self, game_state, action):
-        features = util.Counter()
-        successor = self.get_successor(game_state, action)
-
-        my_state = successor.get_agent_state(self.index)
+        my_state = game_state.get_agent_state(self.index)
         my_pos = my_state.get_position()
 
-        # Computes whether we're on defense (1) or offense (0)
-        features['on_defense'] = 1
-        if my_state.is_pacman: features['on_defense'] = 0
+        if my_pos is None:
+            return Directions.STOP
 
-        # Computes distance to invaders we can see
-        enemies = [successor.get_agent_state(i) for i in self.get_opponents(successor)]
-        invaders = [a for a in enemies if a.is_pacman and a.get_position() is not None]
-        features['num_invaders'] = len(invaders)
+        visible_defenders = self._visible_defenders(game_state)
+        threatened = False
+
+        if visible_defenders:
+            dmin = min(self.get_maze_distance(my_pos, e.get_position()) for e in visible_defenders)
+            threatened = (dmin <= self.danger_dist)
+
+        time_left = getattr(game_state.data, "timeleft", None)
+        carrying = my_state.num_carrying
+
+        invaders = self._visible_invaders(game_state)
+
+        ############################## Act scared ###############
+        if my_state.scared_timer > 0:
+            return self._act_scared(game_state, invaders)
+
+        ############################### Return ###################
+        should_return = (
+                carrying >= self.return_food_threshold
+                or threatened
+                or (time_left is not None and time_left < self.endgame_return_buffer)
+        )
+        if should_return:
+            return self._move_towards(game_state, self.boundary_home)
+
+        ##################################### Mini-Max ###############@#####################
+        return self._minimax_root(game_state, depth=self.search_depth)
+
+    def _minimax_root(self, game_state, depth):
+        legal = game_state.get_legal_actions(self.index)
+        legal = [a for a in legal if a != Directions.STOP] or legal
+
+        best_a = random.choice(legal)
+        best_v = float("-inf")
+        alpha, beta = float("-inf"), float("inf")
+
+        for a in legal:
+            succ = game_state.generate_successor(self.index, a)
+            v = self._alphabeta(succ, depth, self._next_agent(self.index, succ), alpha, beta)
+            if v > best_v:
+                best_v, best_a = v, a
+            alpha = max(alpha, best_v)
+
+        return best_a
+
+    def _alphabeta(self, state, depth, agent_idx, alpha, beta):
+        if depth == 0 or state.is_over():
+            return self._eval_offense(state)
+
+        ########################################### FIX THIS! ############################################
+        st = state.get_agent_state(agent_idx)
+        if st is None or st.get_position() is None or st.configuration is None:
+            return self._eval_offense(state)
+
+        num_agents = state.get_num_agents()
+
+        # Determine whose turn and next depth.
+        next_idx = (agent_idx + 1) % num_agents
+        next_depth = depth - 1 if agent_idx == self.index else depth
+
+        actions = state.get_legal_actions(agent_idx)
+        if not actions:
+            return self._eval_offense(state)
+
+        if agent_idx == self.index:
+            # Max node (our agent)
+            v = float("-inf")
+            for a in actions:
+                succ = state.generate_successor(agent_idx, a)
+                v = max(v, self._alphabeta(succ, next_depth, next_idx, alpha, beta))
+                alpha = max(alpha, v)
+                if alpha >= beta:
+                    break
+            return v
+
+        # Opponents are minimizing
+        if agent_idx in self.get_opponents(state):
+            v = float("inf")
+            for a in actions:
+                succ = state.generate_successor(agent_idx, a)
+                v = min(v, self._alphabeta(succ, next_depth, next_idx, alpha, beta))
+                beta = min(beta, v)
+                if alpha >= beta:
+                    break
+            return v
+        else:
+            # teammate / others: average outcomes (neutral)
+            vals = []
+            for a in actions:
+                succ = state.generate_successor(agent_idx, a)
+                vals.append(self._alphabeta(succ, next_depth, next_idx, alpha, beta))
+            return sum(vals) / float(len(vals))
+
+    # ----------------------------
+    # Evaluation (Offense Heuristic)
+    # ----------------------------
+
+    def _eval_offense(self, game_state):
+        #################Offensive parameters###########
+
+        my_state = game_state.get_agent_state(self.index)
+        my_pos = my_state.get_position()
+
+        if my_pos is None:
+            return float("-inf")
+
+        Score = self.get_score(game_state)
+
+        # Food
+        food = self.get_food(game_state).as_list()
+        food_dist = min((self.get_maze_distance(my_pos, f) for f in food), default=0)
+
+        # Carrying incentive
+        carrying = my_state.num_carrying
+
+        # Return incentive grows with carrying and with time pressure
+        boundary_dist = min(self.get_maze_distance(my_pos, b) for b in self.boundary) if self.boundary else 0
+
+        time_left = getattr(game_state.data, "timeleft", None)
+        endgame_pressure = 0
+
+        if time_left is not None:
+            # small bump as time gets low
+            endgame_pressure = max(0, (self.endgame_return_buffer - time_left))
+
+        # Weighted sum offensive parameters
+        OffensiveScore = 0.0
+        OffensiveScore += 100 * Score                           #score
+        OffensiveScore += 10 * carrying                         # value carrying (future score)
+        OffensiveScore += -2.5 * food_dist                       # move toward food
+        OffensiveScore += -0.8 * boundary_dist * (carrying > 0)  # when carrying, prefer edging home
+        OffensiveScore += -0.3 * endgame_pressure * boundary_dist
+
+        ############################## Defensive parameters #########################
+        DefensiveScore = Score
+
+        # Visible defenders (ghosts) danger
+        defenders = self._visible_defenders(game_state)
+        danger_pen = 0
+
+        if defenders:
+            dmin = min(self.get_maze_distance(my_pos, d.get_position()) for d in defenders)
+
+            #If we can be eaten (they're not scared), avoid strongly when close
+
+            if any(d.scared_timer == 0 for d in defenders):
+                if dmin <= 2:
+                    danger_pen -= 2000
+                else:
+                    danger_pen -= 200 / float(dmin)
+            else:
+                # If defenders are scared, we can be bolder
+                danger_pen += 20 / float(max(1, dmin))
+
+        DefensiveScore += danger_pen
+
+        #aantal invaders
+        invaders = self._visible_invaders(game_state)
+        DefensiveScore -= 100 * len(invaders)
+
+        #als alle tegenstanders dood zijn
+        if len(invaders) == 0:
+            DefensiveScore -= min(self.get_maze_distance(my_pos, b) for b in self.boundary)
+
+        #minimum afstand tot invaders
         if len(invaders) > 0:
-            dists = [self.get_maze_distance(my_pos, a.get_position()) for a in invaders]
-            features['invader_distance'] = min(dists)
+            d = min(self.get_maze_distance(my_pos, i.get_position()) for i in invaders)
+            DefensiveScore = 10 * d
 
-        if action == Directions.STOP: features['stop'] = 1
-        rev = Directions.REVERSE[game_state.get_agent_state(self.index).configuration.direction]
-        if action == rev: features['reverse'] = 1
+        return (0.75 * OffensiveScore + 0.25 * DefensiveScore)
 
-        return features
 
+<<<<<<< HEAD
     def get_weights(self, game_state, action):
         return {'num_invaders': -1000, 'on_defense': 100, 'invader_distance': -10, 'stop': -100, 'reverse': -2}
 
@@ -331,6 +365,31 @@ class DefensiveMinimaxAgent(CaptureAgent):
         if my_pos == target:
             return Directions.STOP
         return self._move_towards(game_state, target)
+=======
+    def _move_towards(self, game_state, target):
+        """Greedy step toward a target; filters moves that are obviously terrible."""
+        actions = game_state.get_legal_actions(self.index)
+        if not actions:
+            return Directions.STOP
+
+        # Prefer not to STOP if we can move
+        non_stop = [a for a in actions if a != Directions.STOP]
+        if non_stop:
+            actions = non_stop
+
+        best = None
+        best_d = float("inf")
+        for a in actions:
+            succ = game_state.generate_successor(self.index, a)
+            pos = succ.get_agent_state(self.index).get_position()
+            if pos is None:
+                continue
+            d = self.get_maze_distance(pos, target)
+            if d < best_d:
+                best_d, best = d, a
+
+        return best if best is not None else random.choice(actions)
+>>>>>>> 4209c55d9c88d4d824bb4c4f0eeaf0606395a890
 
     def _act_scared(self, game_state, invaders):
         my_pos = game_state.get_agent_position(self.index)
@@ -346,12 +405,15 @@ class DefensiveMinimaxAgent(CaptureAgent):
         if len(safe_actions) > 0:
             actions = safe_actions
 
+<<<<<<< HEAD
         # Choose a boundary anchor to hold.
         if len(self.boundary_patrol) > 0:
             anchor = self.boundary_patrol[self.patrol_i % len(self.boundary_patrol)]
         else:
             anchor = self.boundary_home
 
+=======
+>>>>>>> 4209c55d9c88d4d824bb4c4f0eeaf0606395a890
         # Precompute closest invader distance in current state.
         inv_pos = [i.get_position() for i in invaders if i.get_position() is not None]
 
@@ -359,9 +421,13 @@ class DefensiveMinimaxAgent(CaptureAgent):
         for a in actions:
             s = game_state.generate_successor(self.index, a)
             pos = s.get_agent_position(self.index)
+<<<<<<< HEAD
 
             # Base: stay near boundary anchor.
             score = -2 * self.get_maze_distance(pos, anchor)
+=======
+            score = 0
+>>>>>>> 4209c55d9c88d4d824bb4c4f0eeaf0606395a890
 
             # If invaders visible: prefer to keep distance while staying near midline.
             if len(inv_pos) > 0:
@@ -381,6 +447,7 @@ class DefensiveMinimaxAgent(CaptureAgent):
 
         return best_a if best_a is not None else Directions.STOP
 
+<<<<<<< HEAD
     def _move_towards(self, game_state, target):
         actions = list(game_state.get_legal_actions(self.index))
 
@@ -514,9 +581,62 @@ class DefensiveMinimaxAgent(CaptureAgent):
 
         boundary = []
         for y in range(1, h - 1):
+=======
+    # ----------------------------
+    # Helpers
+    # ----------------------------
+
+    def _visible_defenders(self, game_state):
+        """Visible opponents that are ghosts (i.e., defenders), with known positions."""
+        res = []
+        for i in self.get_opponents(game_state):
+            st = game_state.get_agent_state(i)
+            pos = st.get_position()
+            if pos is None:
+                continue
+            # A defender is a ghost: not pacman (on their home side)
+            if not st.is_pacman:
+                res.append(st)
+        return res
+
+    def _visible_invaders(self, game_state):
+        """Visible opponents that are Pacman (invading our side), with known positions."""
+        res = []
+        for i in self.get_opponents(game_state):
+            st = game_state.get_agent_state(i)
+            if st.get_position() is None:
+                continue
+            if st.is_pacman:
+                res.append(st)
+        return res
+
+    def _compute_boundary_positions(self, game_state):
+        walls = game_state.get_walls()
+        width = game_state.data.layout.width
+        height = game_state.data.layout.height
+
+        # Same convention as your defender: boundary x differs for red/blue
+        if self.red:
+            boundary_x = (width // 2) - 1
+        else:
+            boundary_x = (width // 2)
+
+        boundary = []
+        for y in range(height):
+>>>>>>> 4209c55d9c88d4d824bb4c4f0eeaf0606395a890
             if not walls[boundary_x][y]:
                 boundary.append((boundary_x, y))
         return boundary
 
     def _next_agent(self, agent_idx, game_state):
+<<<<<<< HEAD
         return (agent_idx + 1) % game_state.get_num_agents()
+=======
+        return (agent_idx + 1) % game_state.get_num_agents()
+
+
+    # Optional: update your create_team defaults to use the new class:
+    # def create_team(first_index, second_index, is_red,
+    #                 first='OffensiveMinimaxAgent', second='DefensiveMinimaxAgent', num_training=0):
+    #     return [eval(first)(first_index), eval(second)(second_index)]
+>>>>>>> 4209c55d9c88d4d824bb4c4f0eeaf0606395a890
