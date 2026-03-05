@@ -56,46 +56,36 @@ class OffensiveMinimaxAgent(CaptureAgent):
             return self._move_towards(game_state, self.boundary_home)
 
         ##################################### Mini-Max ###############@#####################
-        return self._minimax_root(game_state, depth=self.search_depth)
-
-    def _minimax_root(self, game_state, depth):
-        legal = game_state.get_legal_actions(self.index)
-        legal = [a for a in legal if a != Directions.STOP] or legal
-
-        best_a = random.choice(legal)
-        best_v = float("-inf")
-        alpha, beta = float("-inf"), float("inf")
-
-        for a in legal:
-            succ = game_state.generate_successor(self.index, a)
-            v = self._alphabeta(succ, depth, self._next_agent(self.index, succ), alpha, beta)
-            if v > best_v:
-                best_v, best_a = v, a
-            alpha = max(alpha, best_v)
-
-        return best_a
+        return self._alphabeta(game_state, self.search_depth, 0, float("-inf"), float("+inf"))
 
     def _alphabeta(self, state, depth, agent_idx, alpha, beta):
+        # Terminal
         if depth == 0 or state.is_over():
-            return self._eval_offense(state)
-
-        ########################################### FIX THIS! ############################################
-        st = state.get_agent_state(agent_idx)
-        if st is None or st.get_position() is None or st.configuration is None:
             return self._eval_offense(state)
 
         num_agents = state.get_num_agents()
 
-        # Determine whose turn and next depth.
+        # Compute next turn info FIRST (so we can "skip" safely if needed)
         next_idx = (agent_idx + 1) % num_agents
-        next_depth = depth - 1 if agent_idx == self.index else depth
+
+        # Decrement depth only when the turn order wraps back to us
+        next_depth = depth - 1 if next_idx == self.index else depth
+
+        # If we can't simulate this agent (e.g., unseen enemy => position None), skip their turn
+        st = state.get_agent_state(agent_idx)
+        if st is None or st.get_position() is None or getattr(st, "configuration", None) is None:
+            return self._alphabeta(state, next_depth, next_idx, alpha, beta)
 
         actions = state.get_legal_actions(agent_idx)
         if not actions:
-            return self._eval_offense(state)
+            return self._alphabeta(state, next_depth, next_idx, alpha, beta)
 
-        if agent_idx == self.index:
-            # Max node (our agent)
+        # Optional: avoid STOP everywhere to reduce loops
+
+        actions = [a for a in actions if a != Directions.STOP] or actions
+
+        # Team = MAX, Opponents = MIN (pure minimax => alpha-beta is valid)
+        if agent_idx in self.get_team(state):  # includes self.index
             v = float("-inf")
             for a in actions:
                 succ = state.generate_successor(agent_idx, a)
@@ -104,31 +94,22 @@ class OffensiveMinimaxAgent(CaptureAgent):
                 if alpha >= beta:
                     break
             return v
-
-        # Opponents are minimizing
-        if agent_idx in self.get_opponents(state):
-            v = float("inf")
-            for a in actions:
-                succ = state.generate_successor(agent_idx, a)
-                v = min(v, self._alphabeta(succ, next_depth, next_idx, alpha, beta))
-                beta = min(beta, v)
-                if alpha >= beta:
-                    break
-            return v
         else:
-            # teammate / others: average outcomes (neutral)
-            vals = []
-            for a in actions:
-                succ = state.generate_successor(agent_idx, a)
-                vals.append(self._alphabeta(succ, next_depth, next_idx, alpha, beta))
-            return sum(vals) / float(len(vals))
+           v = float("inf")
+           for a in actions:
+            succ = state.generate_successor(agent_idx, a)
+            v = min(v, self._alphabeta(succ, next_depth, next_idx, alpha, beta))
+            beta = min(beta, v)
+            if alpha >= beta:
+                break
+            return v
 
     # ----------------------------
     # Evaluation (Offense Heuristic)
     # ----------------------------
 
     def _eval_offense(self, game_state):
-        #################Offensive parameters###########
+        ################# Offensive parameters ###########
 
         my_state = game_state.get_agent_state(self.index)
         my_pos = my_state.get_position()
@@ -136,7 +117,7 @@ class OffensiveMinimaxAgent(CaptureAgent):
         if my_pos is None:
             return float("-inf")
 
-        Score = self.get_score(game_state)
+        score = self.get_score(game_state)
 
         # Food
         food = self.get_food(game_state).as_list()
@@ -157,14 +138,14 @@ class OffensiveMinimaxAgent(CaptureAgent):
 
         # Weighted sum offensive parameters
         OffensiveScore = 0.0
-        OffensiveScore += 100 * Score                           #score
+        OffensiveScore += 100 * score                           #score
         OffensiveScore += 10 * carrying                         # value carrying (future score)
         OffensiveScore += -2.5 * food_dist                       # move toward food
         OffensiveScore += -0.8 * boundary_dist * (carrying > 0)  # when carrying, prefer edging home
         OffensiveScore += -0.3 * endgame_pressure * boundary_dist
 
         ############################## Defensive parameters #########################
-        DefensiveScore = Score
+        DefensiveScore = score
 
         # Visible defenders (ghosts) danger
         defenders = self._visible_defenders(game_state)
